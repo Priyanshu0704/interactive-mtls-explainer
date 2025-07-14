@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive mTLS Handshake Explainer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- 
+    Chosen Palette: Calm Harmony. A light neutral background (slate-50), dark text (slate-800), and complementary accents for the Client (blue-500) and Server (teal-500) to create a clear and supportive visual language.
+    Application Structure Plan: A step-by-step interactive "storytelling" design was chosen over a static dashboard to guide the user through the complex, sequential mTLS handshake. The core of the app is a stepper interface with 6 phases. Clicking a phase updates a central visualization and a detailed text panel. This focuses user attention on one part of the process at a time, enhancing comprehension. Key concepts like "Session Key" are placed in an accessible tabbed section below the main flow to provide deeper context without interrupting the learning journey. This structure prioritizes guided learning and clarity.
+    Visualization & Content Choices: 
+    - Report Info: The core mTLS flowchart. Goal: Explain the message sequence. Viz/Presentation: Re-created the flowchart using a two-column HTML/CSS layout (divs, flexbox, borders) instead of the prohibited Mermaid/SVG, allowing for interactivity and styling control. Interaction: Clicking a phase in the navigation reveals only that part of the flowchart and its corresponding text, breaking down the process into digestible steps. Justification: Sequential reveal improves focus and reduces cognitive load. Library: Vanilla JS for interaction logic.
+    - Report Info: Session Key & Keep-Alive explanations. Goal: Inform about related concepts. Viz/Presentation: A tabbed interface using HTML/CSS. Interaction: Click a tab to show its content. Justification: A standard, space-saving UI pattern that provides context on demand. Library: Vanilla JS.
+    CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. 
+    -->
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .phase-content, .tab-content { display: none; }
+        .active { display: block; }
+        .nav-button.active { background-color: #3b82f6; color: white; }
+        .tab-button.active { border-color: #3b82f6; color: #3b82f6; background-color: #eff6ff; }
+        .flow-arrow {
+            position: relative;
+            padding: 0 2rem;
+            display: flex;
+            align-items: center;
+        }
+        .flow-arrow::after {
+            content: '→';
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 2rem;
+            color: #64748b;
+        }
+        .flow-arrow.left::after {
+            content: '←';
+        }
+        .message-box {
+            border-left-width: 4px;
+            padding-left: 1rem;
+            margin-bottom: 1rem;
+        }
+        .client-box { border-color: #3b82f6; }
+        .server-box { border-color: #14b8a6; }
+        .phase-grid {
+            grid-template-columns: 1fr;
+        }
+        @media (min-width: 1024px) {
+            .phase-grid {
+                grid-template-columns: 2fr 1fr;
+            }
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800">
+
+    <div class="container mx-auto p-4 sm:p-6 lg:p-8">
+        
+        <header class="text-center mb-12">
+            <h1 class="text-3xl sm:text-4xl lg:text-5xl font-bold text-slate-900">The Interactive mTLS Handshake</h1>
+            <p class="mt-4 text-lg text-slate-600 max-w-3xl mx-auto">An step-by-step visual guide to understanding how Mutual Transport Layer Security establishes a secure, authenticated connection.</p>
+        </header>
+
+        <main class="bg-white rounded-xl shadow-lg p-4 sm:p-8">
+            
+            <nav class="mb-8">
+                <ul class="flex flex-wrap justify-center gap-2 sm:gap-3">
+                    <li><button data-phase="1" class="phase-nav-button text-sm sm:text-base font-semibold px-4 py-2 rounded-full transition-colors duration-200 hover:bg-blue-500 hover:text-white">Phase 1: Hello</button></li>
+                    <li><button data-phase="2" class="phase-nav-button text-sm sm:text-base font-semibold px-4 py-2 rounded-full transition-colors duration-200 hover:bg-blue-500 hover:text-white">Phase 2: Server Auth</button></li>
+                    <li><button data-phase="3" class="phase-nav-button text-sm sm:text-base font-semibold px-4 py-2 rounded-full transition-colors duration-200 hover:bg-blue-500 hover:text-white">Phase 3: Client Auth</button></li>
+                    <li><button data-phase="4" class="phase-nav-button text-sm sm:text-base font-semibold px-4 py-2 rounded-full transition-colors duration-200 hover:bg-blue-500 hover:text-white">Phase 4: Encryption</button></li>
+                    <li><button data-phase="5" class="phase-nav-button text-sm sm:text-base font-semibold px-4 py-2 rounded-full transition-colors duration-200 hover:bg-blue-500 hover:text-white">Phase 5: Finalization</button></li>
+                    <li><button data-phase="6" class="phase-nav-button text-sm sm:text-base font-semibold px-4 py-2 rounded-full transition-colors duration-200 hover:bg-blue-500 hover:text-white">Phase 6: Data Transfer</button></li>
+                </ul>
+            </nav>
+
+            <div class="border-t border-slate-200 pt-8">
+                <!-- Phase 1 Content -->
+                <div id="phase-1" class="phase-content">
+                    <div class="grid gap-8 phase-grid">
+                        <div class="bg-slate-50 p-6 rounded-lg">
+                            <h3 class="text-2xl font-bold mb-4 text-center">Phase 1: Hello & Negotiation</h3>
+                            <div class="flex justify-between items-start">
+                                <div class="w-2/5 text-center">
+                                    <h4 class="font-bold text-blue-600 mb-2">Client (R)</h4>
+                                    <div class="message-box client-box text-left">
+                                        <p class="font-semibold">ClientHello</p>
+                                        <ul class="list-disc list-inside text-sm text-slate-600">
+                                            <li>Max TLS version</li>
+                                            <li>Supported Ciphers</li>
+                                            <li>Random Number #1</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                                <div class="w-1/5 flow-arrow"></div>
+                                <div class="w-2/5 text-center">
+                                    <h4 class="font-bold text-teal-600 mb-2">Server (S)</h4>
+                                    <div class="message-box server-box text-left mt-16">
+                                        <p class="font-semibold">ServerHello</p>
+                                        <ul class="list-disc list-inside text-sm text-slate-600">
+                                            <li>Chosen TLS version</li>
+                                            <li>Chosen Cipher</li>
+                                            <li>Random Number #2</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="prose max-w-none">
+                            <h4>What's Happening:</h4>
+                            <p>The handshake begins. The Client (R) initiates the conversation by sending a `ClientHello` message. This message tells the Server (S) what capabilities it has, including the cryptographic algorithms (ciphers) it knows and the latest TLS version it can handle. It also sends a random number for later use.</p>
+                            <p>The Server receives this, picks the best cipher and TLS version they both support, generates its own random number, and sends everything back in a `ServerHello` message. This establishes the basic rules for the rest of the conversation.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Phase 2 Content -->
+                <div id="phase-2" class="phase-content">
+                    <div class="grid gap-8 phase-grid">
+                        <div class="bg-slate-50 p-6 rounded-lg">
+                            <h3 class="text-2xl font-bold mb-4 text-center">Phase 2: Server Authentication</h3>
+                            <div class="flex justify-between items-start">
+                                <div class="w-2/5 text-center"><h4 class="font-bold text-blue-600 mb-2">Client (R)</h4></div>
+                                <div class="w-1/5 flow-arrow left"></div>
+                                <div class="w-2/5 text-center">
+                                    <h4 class="font-bold text-teal-600 mb-2">Server (S)</h4>
+                                    <div class="message-box server-box text-left">
+                                        <p class="font-semibold">Certificate</p>
+                                        <p class="text-sm text-slate-600">Sends its public certificate chain.</p>
+                                    </div>
+                                    <div class="message-box server-box text-left">
+                                        <p class="font-semibold">CertificateRequest</p>
+                                        <p class="text-sm text-slate-600">Asks the client to prove its identity.</p>
+                                    </div>
+                                    <div class="message-box server-box text-left">
+                                        <p class="font-semibold">ServerHelloDone</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="prose max-w-none">
+                            <h4>What's Happening:</h4>
+                            <p>Now, the Server (S) must prove its identity to the Client. It sends its SSL/TLS certificate chain. This is its public ID.</p>
+                            <p>Crucially for mTLS, it then sends a `CertificateRequest`. This is the server explicitly asking the client, "Now you show me your ID."</p>
+                            <p>Finally, it sends `ServerHelloDone` to signal that it has finished its part of the initial information exchange.</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Phase 3 Content -->
+                <div id="phase-3" class="phase-content">
+                     <div class="grid gap-8 phase-grid">
+                        <div class="bg-slate-50 p-6 rounded-lg">
+                            <h3 class="text-2xl font-bold mb-4 text-center">Phase 3: Client Authentication</h3>
+                            <div class="flex justify-between items-start">
+                                <div class="w-2/5 text-center">
+                                    <h4 class="font-bold text-blue-600 mb-2">Client (R)</h4>
+                                     <div class="message-box client-box text-left">
+                                        <p class="font-semibold">Certificate</p>
+                                        <p class="text-sm text-slate-600">Sends its own public certificate chain.</p>
+                                    </div>
+                                    <div class="message-box client-box text-left">
+                                        <p class="font-semibold">ClientKeyExchange</p>
+                                        <p class="text-sm text-slate-600">Sends its contribution to the session key.</p>
+                                    </div>
+                                    <div class="message-box client-box text-left">
+                                        <p class="font-semibold">CertificateVerify</p>
+                                        <p class="text-sm text-slate-600">Sends data signed with its private key as proof.</p>
+                                    </div>
+                                </div>
+                                <div class="w-1/5 flow-arrow"></div>
+                                <div class="w-2/5 text-center"><h4 class="font-bold text-teal-600 mb-2">Server (S)</h4></div>
+                            </div>
+                        </div>
+                        <div class="prose max-w-none">
+                            <h4>What's Happening:</h4>
+                             <p>The Client first validates the server's certificate against its own <strong>Truststore</strong>. If the server is trusted, the client responds to the `CertificateRequest`.</p>
+                            <p>It sends its own `Certificate` chain to prove its identity. Then, to prove it actually owns that certificate, it sends a `CertificateVerify` message. This message contains a piece of the handshake data that has been digitally signed with the client's <strong>private key</strong>. Only the true owner of the certificate can produce this signature.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Phase 4 & 5 & 6... -->
+                <div id="phase-4" class="phase-content">
+                    <div class="grid gap-8 phase-grid">
+                        <div class="bg-slate-50 p-6 rounded-lg">
+                            <h3 class="text-2xl font-bold mb-4 text-center">Phase 4: Encryption & Finalization</h3>
+                            <div class="flex justify-center items-center text-center my-4">
+                                <p class="font-semibold text-purple-600">Both R and S independently calculate the Session Key</p>
+                            </div>
+                            <div class="flex justify-between items-start">
+                                <div class="w-2/5 text-center">
+                                    <h4 class="font-bold text-blue-600 mb-2">Client (R)</h4>
+                                     <div class="message-box client-box text-left">
+                                        <p class="font-semibold">ChangeCipherSpec</p>
+                                        <p class="text-sm text-slate-600">"Switching to encrypted mode."</p>
+                                    </div>
+                                    <div class="message-box client-box text-left">
+                                        <p class="font-semibold">Finished</p>
+                                        <p class="text-sm text-slate-600">Encrypted summary of handshake.</p>
+                                    </div>
+                                </div>
+                                <div class="w-1/5 flow-arrow"></div>
+                                <div class="w-2/5 text-center"><h4 class="font-bold text-teal-600 mb-2">Server (S)</h4></div>
+                            </div>
+                        </div>
+                        <div class="prose max-w-none">
+                            <h4>What's Happening:</h4>
+                            <p>Having exchanged random numbers and key exchange data, both the Client and Server can now independently calculate a shared secret key, known as the <strong>Session Key</strong>. This key is never transmitted over the network.</p>
+                            <p>The Client sends a `ChangeCipherSpec` message to formally announce it's switching to encryption. It follows this with an encrypted `Finished` message, containing a hash of all previous messages. This confirms to the server that the handshake was successful from the client's perspective.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="phase-5" class="phase-content">
+                    <div class="grid gap-8 phase-grid">
+                        <div class="bg-slate-50 p-6 rounded-lg">
+                             <h3 class="text-2xl font-bold mb-4 text-center">Phase 5: Server Finalization</h3>
+                            <div class="flex justify-between items-start">
+                                <div class="w-2/5 text-center"><h4 class="font-bold text-blue-600 mb-2">Client (R)</h4></div>
+                                <div class="w-1/5 flow-arrow left"></div>
+                                <div class="w-2/5 text-center">
+                                    <h4 class="font-bold text-teal-600 mb-2">Server (S)</h4>
+                                    <div class="p-4 bg-green-100 text-green-800 rounded-lg text-center mb-4">
+                                        <p class="font-semibold">Server validates client's certificate and signature.</p>
+                                    </div>
+                                    <div class="message-box server-box text-left">
+                                        <p class="font-semibold">ChangeCipherSpec</p>
+                                    </div>
+                                    <div class="message-box server-box text-left">
+                                        <p class="font-semibold">Finished</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="prose max-w-none">
+                            <h4>What's Happening:</h4>
+                            <p>The Server receives the client's messages. It uses the client's public certificate to verify the `CertificateVerify` signature. If it's valid, the client is authenticated.</p>
+                             <p>The Server then sends its own `ChangeCipherSpec` and encrypted `Finished` messages. When the client decrypts this, both sides have confirmed that the handshake was successful and not tampered with. The secure tunnel is now established.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="phase-6" class="phase-content">
+                    <div class="grid gap-8 phase-grid">
+                        <div class="bg-slate-50 p-6 rounded-lg">
+                            <h3 class="text-2xl font-bold mb-4 text-center">Phase 6: Secure Data Transfer</h3>
+                            <div class="flex justify-center items-center text-center my-4">
+                                <p class="font-bold text-xl text-green-600">--- SECURE TUNNEL IS LIVE ---</p>
+                            </div>
+                            <div class="flex justify-between items-start">
+                                <div class="w-2/5 text-center">
+                                    <h4 class="font-bold text-blue-600 mb-2">Client (R)</h4>
+                                    <div class="message-box client-box text-left">
+                                        <p class="font-semibold">Encrypted HTTP Request</p>
+                                        <p class="text-sm text-slate-600">(e.g., GET /data HTTP/1.1)</p>
+                                    </div>
+                                </div>
+                                <div class="w-1/5 flow-arrow"></div>
+                                <div class="w-2/5 text-center">
+                                    <h4 class="font-bold text-teal-600 mb-2">Server (S)</h4>
+                                </div>
+                            </div>
+                            <div class="flex justify-between items-start mt-4">
+                                <div class="w-2/5 text-center"></div>
+                                <div class="w-1/5 flow-arrow left"></div>
+                                <div class="w-2/5 text-center">
+                                     <div class="message-box server-box text-left">
+                                        <p class="font-semibold">Encrypted HTTP Response</p>
+                                        <p class="text-sm text-slate-600">(e.g., 200 OK)</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="prose max-w-none">
+                            <h4>What's Happening:</h4>
+                            <p>The handshake is complete. The Client can now send its actual application data (the HTTP API request) through the encrypted tunnel. The Server decrypts it, processes it, and sends back an encrypted HTTP response.</p>
+                            <p>This entire handshake process happens in milliseconds, but it establishes a foundation of trust and confidentiality for the real application data that follows.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+        
+        <section class="mt-12">
+            <h2 class="text-3xl font-bold text-center mb-8 text-slate-900">Key Concepts</h2>
+            <div class="max-w-4xl mx-auto">
+                 <div class="border-b border-slate-200 mb-4">
+                    <nav class="flex -mb-px space-x-6" aria-label="Tabs">
+                      <button data-tab="1" class="tab-button whitespace-nowrap py-4 px-1 border-b-2 font-medium text-lg text-slate-500 hover:text-blue-600 hover:border-blue-500">Session Key</button>
+                      <button data-tab="2" class="tab-button whitespace-nowrap py-4 px-1 border-b-2 font-medium text-lg text-slate-500 hover:text-blue-600 hover:border-blue-500">Connection Duration</button>
+                    </nav>
+                 </div>
+                 <div>
+                    <div id="tab-1" class="tab-content prose max-w-none">
+                        <h4>What is a Session Key?</h4>
+                        <p>A session key is a single, symmetric key used for encrypting and decrypting the actual data of your API call. "Symmetric" means the exact same key is used for both locking (encryption) and unlocking (decryption). It is created ephemerally (on-the-fly) for every new TLS session by both the client and server independently, without ever being sent over the network.</p>
+                        <p>This is done for efficiency. The asymmetric (public/private key) cryptography used during the handshake is great for authentication but very slow. Symmetric encryption is thousands of times faster, making it perfect for encrypting the bulk data of the API request and response.</p>
+                    </div>
+                    <div id="tab-2" class="tab-content prose max-w-none">
+                        <h4>What is Connection Duration (HTTP Keep-Alive)?</h4>
+                        <p>The TLS handshake establishes a secure session. How long this connection can be reused for multiple API calls is determined by a mechanism called HTTP Keep-Alive.</p>
+                        <p>Without it, the expensive handshake would need to happen for every single API call. Keep-Alive allows the same TCP connection to be reused. The duration is not a fixed time but is governed by a negotiation between the client, server, and any network devices in between. The connection will be dropped by the component with the most restrictive (shortest) idle timeout.</p>
+                    </div>
+                 </div>
+            </div>
+        </section>
+
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const phaseButtons = document.querySelectorAll('.phase-nav-button');
+            const phaseContents = document.querySelectorAll('.phase-content');
+            const tabButtons = document.querySelectorAll('.tab-button');
+            const tabContents = document.querySelectorAll('.tab-content');
+
+            function showPhase(phaseNumber) {
+                phaseButtons.forEach(button => {
+                    button.classList.remove('active');
+                    if (button.dataset.phase === phaseNumber) {
+                        button.classList.add('active');
+                    }
+                });
+                phaseContents.forEach(content => {
+                    content.classList.remove('active');
+                    if (content.id === `phase-${phaseNumber}`) {
+                        content.classList.add('active');
+                    }
+                });
+            }
+
+            function showTab(tabNumber) {
+                 tabButtons.forEach(button => {
+                    button.classList.remove('active');
+                    if (button.dataset.tab === tabNumber) {
+                        button.classList.add('active');
+                    }
+                });
+                tabContents.forEach(content => {
+                    content.classList.remove('active');
+                    if (content.id === `tab-${tabNumber}`) {
+                        content.classList.add('active');
+                    }
+                });
+            }
+
+            phaseButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    showPhase(button.dataset.phase);
+                });
+            });
+
+            tabButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    showTab(button.dataset.tab);
+                });
+            });
+
+            showPhase('1');
+            showTab('1');
+        });
+    </script>
+
+</body>
+</html>
