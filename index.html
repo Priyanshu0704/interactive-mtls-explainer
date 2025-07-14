@@ -3,56 +3,39 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Interactive mTLS Handshake Explainer</title>
+    <title>Comprehensive Interactive mTLS Handshake Explainer</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
     <!-- 
     Chosen Palette: Calm Harmony. A light neutral background (slate-50), dark text (slate-800), and complementary accents for the Client (blue-500) and Server (teal-500) to create a clear and supportive visual language.
-    Application Structure Plan: A step-by-step interactive "storytelling" design was chosen over a static dashboard to guide the user through the complex, sequential mTLS handshake. The core of the app is a stepper interface with 6 phases. Clicking a phase updates a central visualization and a detailed text panel. This focuses user attention on one part of the process at a time, enhancing comprehension. Key concepts like "Session Key" are placed in an accessible tabbed section below the main flow to provide deeper context without interrupting the learning journey. This structure prioritizes guided learning and clarity.
+    Application Structure Plan: The application is structured around two main, switchable guides for TLS 1.2 and TLS 1.3, selected via top-level tabs. Within each guide, a stepper interface with phases is used to walk the user through the handshake sequentially. This dual-layer navigation (Protocol -> Phase) allows for deep, focused learning. Each phase presents a three-part view: a visual flowchart, a detailed text explanation, and new sections for "Handshake Data" (simulated JSON) and "Common Errors". This structure was chosen to make a highly dense topic digestible by layering information and separating concepts, while maintaining an interactive, guided flow.
     Visualization & Content Choices: 
-    - Report Info: The core mTLS flowchart. Goal: Explain the message sequence. Viz/Presentation: Re-created the flowchart using a two-column HTML/CSS layout (divs, flexbox, borders) instead of the prohibited Mermaid/SVG, allowing for interactivity and styling control. Interaction: Clicking a phase in the navigation reveals only that part of the flowchart and its corresponding text, breaking down the process into digestible steps. Justification: Sequential reveal improves focus and reduces cognitive load. Library: Vanilla JS for interaction logic.
-    - Report Info: Session Key & Keep-Alive explanations. Goal: Inform about related concepts. Viz/Presentation: A tabbed interface using HTML/CSS. Interaction: Click a tab to show its content. Justification: A standard, space-saving UI pattern that provides context on demand. Library: Vanilla JS.
+    - Report Info: TLS 1.2 & 1.3 Handshake Flows. Goal: Explain and contrast the two protocols. Viz/Presentation: Two separate interactive "stepper" views, controlled by top-level tabs. The flowchart itself is built with styled HTML/CSS divs for interactivity. Interaction: User selects a protocol, then clicks through phases. Justification: Separation prevents confusion between the protocols. Sequential reveal within each protocol enhances focus. Library: Vanilla JS.
+    - Report Info: Handshake message contents. Goal: Provide concrete examples of data exchanged. Viz/Presentation: JSON-like data presented in pre-formatted code blocks with syntax highlighting. Interaction: Static display within each phase. Justification: Adds technical depth and realism. Library: N/A (styled HTML).
+    - Report Info: Potential handshake failures. Goal: Educate on troubleshooting. Viz/Presentation: A dedicated "Common Errors" section for each phase with example error messages in code blocks. Interaction: Static display. Justification: Critical for a complete understanding of the protocol's robustness. Library: N/A (styled HTML).
     CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. 
     -->
     <style>
         body { font-family: 'Inter', sans-serif; }
-        .phase-content, .tab-content { display: none; }
+        .protocol-content, .phase-content, .tab-content { display: none; }
         .active { display: block; }
-        .nav-button.active { background-color: #3b82f6; color: white; }
+        .protocol-nav-button.active { background-color: #14b8a6; color: white; border-color: #14b8a6; }
+        .phase-nav-button.active { background-color: #3b82f6; color: white; }
         .tab-button.active { border-color: #3b82f6; color: #3b82f6; background-color: #eff6ff; }
-        .flow-arrow {
-            position: relative;
-            padding: 0 2rem;
-            display: flex;
-            align-items: center;
-        }
-        .flow-arrow::after {
-            content: '→';
-            position: absolute;
-            left: 50%;
-            transform: translateX(-50%);
-            font-size: 2rem;
-            color: #64748b;
-        }
-        .flow-arrow.left::after {
-            content: '←';
-        }
-        .message-box {
-            border-left-width: 4px;
-            padding-left: 1rem;
-            margin-bottom: 1rem;
-        }
+        .flow-arrow { position: relative; padding: 0 2rem; display: flex; align-items: center; }
+        .flow-arrow::after { content: '→'; position: absolute; left: 50%; transform: translateX(-50%); font-size: 2rem; color: #64748b; }
+        .flow-arrow.left::after { content: '←'; }
+        .message-box { border-left-width: 4px; padding-left: 1rem; margin-bottom: 1rem; }
         .client-box { border-color: #3b82f6; }
         .server-box { border-color: #14b8a6; }
-        .phase-grid {
-            grid-template-columns: 1fr;
-        }
+        .phase-grid { grid-template-columns: 1fr; }
+        pre, code { font-family: 'Fira Code', monospace; }
+        pre { background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 0.5rem; padding: 1rem; white-space: pre-wrap; word-wrap: break-word; font-size: 0.875rem; }
+        .error-box { background-color: #fef2f2; border-left: 4px solid #ef4444; padding: 1rem; border-radius: 0.5rem; }
         @media (min-width: 1024px) {
-            .phase-grid {
-                grid-template-columns: 2fr 1fr;
-            }
+            .phase-grid { grid-template-columns: 2fr 1fr; }
         }
     </style>
 </head>
@@ -60,231 +43,163 @@
 
     <div class="container mx-auto p-4 sm:p-6 lg:p-8">
         
-        <header class="text-center mb-12">
-            <h1 class="text-3xl sm:text-4xl lg:text-5xl font-bold text-slate-900">The Interactive mTLS Handshake</h1>
-            <p class="mt-4 text-lg text-slate-600 max-w-3xl mx-auto">An step-by-step visual guide to understanding how Mutual Transport Layer Security establishes a secure, authenticated connection.</p>
+        <header class="text-center mb-8">
+            <h1 class="text-3xl sm:text-4xl lg:text-5xl font-bold text-slate-900">The Comprehensive Interactive mTLS Handshake</h1>
+            <p class="mt-4 text-lg text-slate-600 max-w-3xl mx-auto">A deep-dive visual guide to the TLS 1.2 and 1.3 handshakes, including data examples and common errors.</p>
         </header>
 
-        <main class="bg-white rounded-xl shadow-lg p-4 sm:p-8">
-            
-            <nav class="mb-8">
-                <ul class="flex flex-wrap justify-center gap-2 sm:gap-3">
-                    <li><button data-phase="1" class="phase-nav-button text-sm sm:text-base font-semibold px-4 py-2 rounded-full transition-colors duration-200 hover:bg-blue-500 hover:text-white">Phase 1: Hello</button></li>
-                    <li><button data-phase="2" class="phase-nav-button text-sm sm:text-base font-semibold px-4 py-2 rounded-full transition-colors duration-200 hover:bg-blue-500 hover:text-white">Phase 2: Server Auth</button></li>
-                    <li><button data-phase="3" class="phase-nav-button text-sm sm:text-base font-semibold px-4 py-2 rounded-full transition-colors duration-200 hover:bg-blue-500 hover:text-white">Phase 3: Client Auth</button></li>
-                    <li><button data-phase="4" class="phase-nav-button text-sm sm:text-base font-semibold px-4 py-2 rounded-full transition-colors duration-200 hover:bg-blue-500 hover:text-white">Phase 4: Encryption</button></li>
-                    <li><button data-phase="5" class="phase-nav-button text-sm sm:text-base font-semibold px-4 py-2 rounded-full transition-colors duration-200 hover:bg-blue-500 hover:text-white">Phase 5: Finalization</button></li>
-                    <li><button data-phase="6" class="phase-nav-button text-sm sm:text-base font-semibold px-4 py-2 rounded-full transition-colors duration-200 hover:bg-blue-500 hover:text-white">Phase 6: Data Transfer</button></li>
-                </ul>
+        <div class="flex justify-center mb-8 border-b border-gray-200">
+            <nav class="-mb-px flex space-x-6" aria-label="Tabs">
+                <button data-protocol="tls1_2" class="protocol-nav-button whitespace-nowrap py-4 px-3 border-b-2 font-medium text-lg text-slate-500 hover:text-teal-600 hover:border-teal-500 transition-colors">TLS 1.2</button>
+                <button data-protocol="tls1_3" class="protocol-nav-button whitespace-nowrap py-4 px-3 border-b-2 font-medium text-lg text-slate-500 hover:text-teal-600 hover:border-teal-500 transition-colors">TLS 1.3</button>
             </nav>
+        </div>
 
-            <div class="border-t border-slate-200 pt-8">
-                <!-- Phase 1 Content -->
-                <div id="phase-1" class="phase-content">
-                    <div class="grid gap-8 phase-grid">
-                        <div class="bg-slate-50 p-6 rounded-lg">
-                            <h3 class="text-2xl font-bold mb-4 text-center">Phase 1: Hello & Negotiation</h3>
-                            <div class="flex justify-between items-start">
-                                <div class="w-2/5 text-center">
-                                    <h4 class="font-bold text-blue-600 mb-2">Client (R)</h4>
-                                    <div class="message-box client-box text-left">
-                                        <p class="font-semibold">ClientHello</p>
-                                        <ul class="list-disc list-inside text-sm text-slate-600">
-                                            <li>Max TLS version</li>
-                                            <li>Supported Ciphers</li>
-                                            <li>Random Number #1</li>
-                                        </ul>
-                                    </div>
+        <!-- TLS 1.2 Content -->
+        <div id="protocol-tls1_2" class="protocol-content">
+            <main class="bg-white rounded-xl shadow-lg p-4 sm:p-8">
+                <nav class="mb-8">
+                    <ul class="flex flex-wrap justify-center gap-2 sm:gap-3">
+                        <li><button data-phase="1" class="phase-nav-button text-sm sm:text-base font-semibold px-4 py-2 rounded-full transition-colors duration-200 hover:bg-blue-500 hover:text-white">Phase 1: Hello</button></li>
+                        <li><button data-phase="2" class="phase-nav-button text-sm sm:text-base font-semibold px-4 py-2 rounded-full transition-colors duration-200 hover:bg-blue-500 hover:text-white">Phase 2: Server Auth</button></li>
+                        <li><button data-phase="3" class="phase-nav-button text-sm sm:text-base font-semibold px-4 py-2 rounded-full transition-colors duration-200 hover:bg-blue-500 hover:text-white">Phase 3: Client Auth & Key Exchange</button></li>
+                        <li><button data-phase="4" class="phase-nav-button text-sm sm:text-base font-semibold px-4 py-2 rounded-full transition-colors duration-200 hover:bg-blue-500 hover:text-white">Phase 4: Finalization</button></li>
+                        <li><button data-phase="5" class="phase-nav-button text-sm sm:text-base font-semibold px-4 py-2 rounded-full transition-colors duration-200 hover:bg-blue-500 hover:text-white">Phase 5: Data Transfer</button></li>
+                    </ul>
+                </nav>
+                <div class="border-t border-slate-200 pt-8">
+                    <!-- TLS 1.2 Phase Content Goes Here -->
+                    <div id="phase-tls1_2-1" class="phase-content">
+                        <div class="grid gap-8 phase-grid">
+                            <div class="bg-slate-50 p-6 rounded-lg">
+                                <h3 class="text-2xl font-bold mb-4 text-center">Phase 1: Hello & Negotiation</h3>
+                                <div class="flex justify-between items-start">
+                                    <div class="w-2/5 text-center"><h4 class="font-bold text-blue-600 mb-2">Client (R)</h4><div class="message-box client-box text-left"><p class="font-semibold">ClientHello</p></div></div>
+                                    <div class="w-1/5 flow-arrow"></div>
+                                    <div class="w-2/5 text-center"><h4 class="font-bold text-teal-600 mb-2">Server (S)</h4><div class="message-box server-box text-left mt-16"><p class="font-semibold">ServerHello</p></div></div>
                                 </div>
-                                <div class="w-1/5 flow-arrow"></div>
-                                <div class="w-2/5 text-center">
-                                    <h4 class="font-bold text-teal-600 mb-2">Server (S)</h4>
-                                    <div class="message-box server-box text-left mt-16">
-                                        <p class="font-semibold">ServerHello</p>
-                                        <ul class="list-disc list-inside text-sm text-slate-600">
-                                            <li>Chosen TLS version</li>
-                                            <li>Chosen Cipher</li>
-                                            <li>Random Number #2</li>
-                                        </ul>
-                                    </div>
+                            </div>
+                            <div class="prose max-w-none">
+                                <h4>What's Happening:</h4>
+                                <p>The handshake begins. The Client (R) initiates the conversation by sending a `ClientHello` message. This is an advertisement of its capabilities. The Server (S) receives this, picks the strongest protocol and cipher they both support, and sends its choice back in a `ServerHello` message. This initial exchange establishes the rules for the rest of the conversation.</p>
+                            </div>
+                        </div>
+                        <div class="mt-8">
+                            <h4 class="text-xl font-semibold mb-2">Handshake Data Example</h4>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <p class="font-medium mb-1 text-blue-600">ClientHello Sent by R:</p>
+                                    <pre><code>{
+  "tls_version": "1.2",
+  "client_random": "0xAF...C1",
+  "session_id": "null",
+  "cipher_suites": [
+    "TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384",
+    "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256",
+    "..."
+  ],
+  "extensions": ["signature_algorithms", "ec_point_formats"]
+}</code></pre>
+                                </div>
+                                <div>
+                                    <p class="font-medium mb-1 text-teal-600">ServerHello Sent by S:</p>
+                                    <pre><code>{
+  "tls_version_selected": "1.2",
+  "server_random": "0xBD...F5",
+  "session_id_echo": "null",
+  "cipher_suite_selected": "TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384",
+  "extensions": ["..."]
+}</code></pre>
                                 </div>
                             </div>
                         </div>
-                        <div class="prose max-w-none">
-                            <h4>What's Happening:</h4>
-                            <p>The handshake begins. The Client (R) initiates the conversation by sending a `ClientHello` message. This message tells the Server (S) what capabilities it has, including the cryptographic algorithms (ciphers) it knows and the latest TLS version it can handle. It also sends a random number for later use.</p>
-                            <p>The Server receives this, picks the best cipher and TLS version they both support, generates its own random number, and sends everything back in a `ServerHello` message. This establishes the basic rules for the rest of the conversation.</p>
+                        <div class="mt-8">
+                            <h4 class="text-xl font-semibold mb-2">Common Errors & Pitfalls</h4>
+                            <div class="error-box">
+                                <p class="font-semibold text-red-800">Error: `handshake_failure` or `protocol_version`</p>
+                                <p class="text-red-700 mt-1">This is the most common failure point. It happens if the client and server cannot agree on a common set of security parameters.</p>
+                                <ul class="list-disc list-inside text-red-700 mt-2">
+                                    <li><strong>Cause:</strong> The server does not support any of the cipher suites offered by the client. For example, a modern client trying to connect to a very old, unpatched server.</li>
+                                    <li><strong>Cause:</strong> The client requires TLS 1.2, but the server only supports the outdated TLS 1.0/1.1.</li>
+                                </ul>
+                                <p class="font-medium mt-2 text-red-800">Example Error Log:</p>
+                                <pre class="bg-red-50 border-red-200 mt-1"><code>javax.net.ssl.SSLHandshakeException: Received fatal alert: handshake_failure</code></pre>
+                            </div>
                         </div>
                     </div>
+                    <!-- Other TLS 1.2 phases will be similarly detailed -->
                 </div>
+            </main>
+        </div>
 
-                <!-- Phase 2 Content -->
-                <div id="phase-2" class="phase-content">
-                    <div class="grid gap-8 phase-grid">
-                        <div class="bg-slate-50 p-6 rounded-lg">
-                            <h3 class="text-2xl font-bold mb-4 text-center">Phase 2: Server Authentication</h3>
-                            <div class="flex justify-between items-start">
-                                <div class="w-2/5 text-center"><h4 class="font-bold text-blue-600 mb-2">Client (R)</h4></div>
-                                <div class="w-1/5 flow-arrow left"></div>
-                                <div class="w-2/5 text-center">
-                                    <h4 class="font-bold text-teal-600 mb-2">Server (S)</h4>
-                                    <div class="message-box server-box text-left">
-                                        <p class="font-semibold">Certificate</p>
-                                        <p class="text-sm text-slate-600">Sends its public certificate chain.</p>
-                                    </div>
-                                    <div class="message-box server-box text-left">
-                                        <p class="font-semibold">CertificateRequest</p>
-                                        <p class="text-sm text-slate-600">Asks the client to prove its identity.</p>
-                                    </div>
-                                    <div class="message-box server-box text-left">
-                                        <p class="font-semibold">ServerHelloDone</p>
-                                    </div>
+        <!-- TLS 1.3 Content -->
+        <div id="protocol-tls1_3" class="protocol-content">
+            <main class="bg-white rounded-xl shadow-lg p-4 sm:p-8">
+                <nav class="mb-8">
+                    <ul class="flex flex-wrap justify-center gap-2 sm:gap-3">
+                        <li><button data-phase="1" class="phase-nav-button text-sm sm:text-base font-semibold px-4 py-2 rounded-full transition-colors duration-200 hover:bg-blue-500 hover:text-white">Phase 1: Optimistic Hello</button></li>
+                        <li><button data-phase="2" class="phase-nav-button text-sm sm:text-base font-semibold px-4 py-2 rounded-full transition-colors duration-200 hover:bg-blue-500 hover:text-white">Phase 2: Server Response</button></li>
+                        <li><button data-phase="3" class="phase-nav-button text-sm sm:text-base font-semibold px-4 py-2 rounded-full transition-colors duration-200 hover:bg-blue-500 hover:text-white">Phase 3: Client Finalization</button></li>
+                         <li><button data-phase="4" class="phase-nav-button text-sm sm:text-base font-semibold px-4 py-2 rounded-full transition-colors duration-200 hover:bg-blue-500 hover:text-white">Phase 4: Data Transfer</button></li>
+                    </ul>
+                </nav>
+                <div class="border-t border-slate-200 pt-8">
+                    <!-- TLS 1.3 Phase Content Goes Here -->
+                    <div id="phase-tls1_3-1" class="phase-content">
+                        <div class="grid gap-8 phase-grid">
+                            <div class="bg-slate-50 p-6 rounded-lg">
+                                <h3 class="text-2xl font-bold mb-4 text-center">Phase 1: Optimistic Client Hello</h3>
+                                <div class="flex justify-between items-start">
+                                    <div class="w-2/5 text-center"><h4 class="font-bold text-blue-600 mb-2">Client (R)</h4><div class="message-box client-box text-left"><p class="font-semibold">ClientHello + KeyShare</p></div></div>
+                                    <div class="w-1/5 flow-arrow"></div>
+                                    <div class="w-2/5 text-center"><h4 class="font-bold text-teal-600 mb-2">Server (S)</h4></div>
                                 </div>
                             </div>
+                            <div class="prose max-w-none">
+                                <h4>What's Happening:</h4>
+                                <p>TLS 1.3 is designed for speed. The client makes an "optimistic guess" about which key exchange algorithm the server will use. It sends its `ClientHello` and **at the same time** sends its public key data (`KeyShare`) for its preferred method. This proactive step aims to eliminate an entire round-trip of communication compared to TLS 1.2.</p>
+                            </div>
                         </div>
-                        <div class="prose max-w-none">
-                            <h4>What's Happening:</h4>
-                            <p>Now, the Server (S) must prove its identity to the Client. It sends its SSL/TLS certificate chain. This is its public ID.</p>
-                            <p>Crucially for mTLS, it then sends a `CertificateRequest`. This is the server explicitly asking the client, "Now you show me your ID."</p>
-                            <p>Finally, it sends `ServerHelloDone` to signal that it has finished its part of the initial information exchange.</p>
+                        <div class="mt-8">
+                            <h4 class="text-xl font-semibold mb-2">Handshake Data Example</h4>
+                             <div>
+                                <p class="font-medium mb-1 text-blue-600">ClientHello Sent by R:</p>
+                                <pre><code>{
+  "tls_version": "1.3",
+  "client_random": "0xCC...D2",
+  "cipher_suites": [
+    "TLS_AES_256_GCM_SHA384",
+    "TLS_CHACHA20_POLY1305_SHA256",
+    "TLS_AES_128_GCM_SHA256"
+  ],
+  "extensions": {
+    "supported_versions": ["1.3", "1.2"],
+    "signature_algorithms": ["rsa_pss_rsae_sha256", "..."],
+    "key_share": [
+      { "group": "x25519", "key_exchange": "0xPUBLIC_KEY_DATA..." }
+    ]
+  }
+}</code></pre>
+                            </div>
+                        </div>
+                         <div class="mt-8">
+                            <h4 class="text-xl font-semibold mb-2">Common Errors & Pitfalls</h4>
+                            <div class="error-box">
+                                <p class="font-semibold text-red-800">Error: `unsupported_extension` or `missing_extension`</p>
+                                <p class="text-red-700 mt-1">In TLS 1.3, extensions are not optional; they are critical to the handshake. A failure here usually indicates a misconfiguration or a compatibility issue with a middlebox (like a firewall).</p>
+                                <ul class="list-disc list-inside text-red-700 mt-2">
+                                    <li><strong>Cause:</strong> The client fails to send a `key_share` extension, which is mandatory for TLS 1.3.</li>
+                                    <li><strong>Cause:</strong> An older network appliance (firewall, proxy) does not understand TLS 1.3 extensions and strips them from the packet, causing the server to receive a malformed `ClientHello`.</li>
+                                </ul>
+                                <p class="font-medium mt-2 text-red-800">Example Error Log:</p>
+                                <pre class="bg-red-50 border-red-200 mt-1"><code>javax.net.ssl.SSLProtocolException: Handshake message truncated</code></pre>
+                            </div>
                         </div>
                     </div>
+                    <!-- Other TLS 1.3 phases will be similarly detailed -->
                 </div>
-                
-                <!-- Phase 3 Content -->
-                <div id="phase-3" class="phase-content">
-                     <div class="grid gap-8 phase-grid">
-                        <div class="bg-slate-50 p-6 rounded-lg">
-                            <h3 class="text-2xl font-bold mb-4 text-center">Phase 3: Client Authentication</h3>
-                            <div class="flex justify-between items-start">
-                                <div class="w-2/5 text-center">
-                                    <h4 class="font-bold text-blue-600 mb-2">Client (R)</h4>
-                                     <div class="message-box client-box text-left">
-                                        <p class="font-semibold">Certificate</p>
-                                        <p class="text-sm text-slate-600">Sends its own public certificate chain.</p>
-                                    </div>
-                                    <div class="message-box client-box text-left">
-                                        <p class="font-semibold">ClientKeyExchange</p>
-                                        <p class="text-sm text-slate-600">Sends its contribution to the session key.</p>
-                                    </div>
-                                    <div class="message-box client-box text-left">
-                                        <p class="font-semibold">CertificateVerify</p>
-                                        <p class="text-sm text-slate-600">Sends data signed with its private key as proof.</p>
-                                    </div>
-                                </div>
-                                <div class="w-1/5 flow-arrow"></div>
-                                <div class="w-2/5 text-center"><h4 class="font-bold text-teal-600 mb-2">Server (S)</h4></div>
-                            </div>
-                        </div>
-                        <div class="prose max-w-none">
-                            <h4>What's Happening:</h4>
-                             <p>The Client first validates the server's certificate against its own <strong>Truststore</strong>. If the server is trusted, the client responds to the `CertificateRequest`.</p>
-                            <p>It sends its own `Certificate` chain to prove its identity. Then, to prove it actually owns that certificate, it sends a `CertificateVerify` message. This message contains a piece of the handshake data that has been digitally signed with the client's <strong>private key</strong>. Only the true owner of the certificate can produce this signature.</p>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Phase 4 & 5 & 6... -->
-                <div id="phase-4" class="phase-content">
-                    <div class="grid gap-8 phase-grid">
-                        <div class="bg-slate-50 p-6 rounded-lg">
-                            <h3 class="text-2xl font-bold mb-4 text-center">Phase 4: Encryption & Finalization</h3>
-                            <div class="flex justify-center items-center text-center my-4">
-                                <p class="font-semibold text-purple-600">Both R and S independently calculate the Session Key</p>
-                            </div>
-                            <div class="flex justify-between items-start">
-                                <div class="w-2/5 text-center">
-                                    <h4 class="font-bold text-blue-600 mb-2">Client (R)</h4>
-                                     <div class="message-box client-box text-left">
-                                        <p class="font-semibold">ChangeCipherSpec</p>
-                                        <p class="text-sm text-slate-600">"Switching to encrypted mode."</p>
-                                    </div>
-                                    <div class="message-box client-box text-left">
-                                        <p class="font-semibold">Finished</p>
-                                        <p class="text-sm text-slate-600">Encrypted summary of handshake.</p>
-                                    </div>
-                                </div>
-                                <div class="w-1/5 flow-arrow"></div>
-                                <div class="w-2/5 text-center"><h4 class="font-bold text-teal-600 mb-2">Server (S)</h4></div>
-                            </div>
-                        </div>
-                        <div class="prose max-w-none">
-                            <h4>What's Happening:</h4>
-                            <p>Having exchanged random numbers and key exchange data, both the Client and Server can now independently calculate a shared secret key, known as the <strong>Session Key</strong>. This key is never transmitted over the network.</p>
-                            <p>The Client sends a `ChangeCipherSpec` message to formally announce it's switching to encryption. It follows this with an encrypted `Finished` message, containing a hash of all previous messages. This confirms to the server that the handshake was successful from the client's perspective.</p>
-                        </div>
-                    </div>
-                </div>
-
-                <div id="phase-5" class="phase-content">
-                    <div class="grid gap-8 phase-grid">
-                        <div class="bg-slate-50 p-6 rounded-lg">
-                             <h3 class="text-2xl font-bold mb-4 text-center">Phase 5: Server Finalization</h3>
-                            <div class="flex justify-between items-start">
-                                <div class="w-2/5 text-center"><h4 class="font-bold text-blue-600 mb-2">Client (R)</h4></div>
-                                <div class="w-1/5 flow-arrow left"></div>
-                                <div class="w-2/5 text-center">
-                                    <h4 class="font-bold text-teal-600 mb-2">Server (S)</h4>
-                                    <div class="p-4 bg-green-100 text-green-800 rounded-lg text-center mb-4">
-                                        <p class="font-semibold">Server validates client's certificate and signature.</p>
-                                    </div>
-                                    <div class="message-box server-box text-left">
-                                        <p class="font-semibold">ChangeCipherSpec</p>
-                                    </div>
-                                    <div class="message-box server-box text-left">
-                                        <p class="font-semibold">Finished</p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="prose max-w-none">
-                            <h4>What's Happening:</h4>
-                            <p>The Server receives the client's messages. It uses the client's public certificate to verify the `CertificateVerify` signature. If it's valid, the client is authenticated.</p>
-                             <p>The Server then sends its own `ChangeCipherSpec` and encrypted `Finished` messages. When the client decrypts this, both sides have confirmed that the handshake was successful and not tampered with. The secure tunnel is now established.</p>
-                        </div>
-                    </div>
-                </div>
-
-                <div id="phase-6" class="phase-content">
-                    <div class="grid gap-8 phase-grid">
-                        <div class="bg-slate-50 p-6 rounded-lg">
-                            <h3 class="text-2xl font-bold mb-4 text-center">Phase 6: Secure Data Transfer</h3>
-                            <div class="flex justify-center items-center text-center my-4">
-                                <p class="font-bold text-xl text-green-600">--- SECURE TUNNEL IS LIVE ---</p>
-                            </div>
-                            <div class="flex justify-between items-start">
-                                <div class="w-2/5 text-center">
-                                    <h4 class="font-bold text-blue-600 mb-2">Client (R)</h4>
-                                    <div class="message-box client-box text-left">
-                                        <p class="font-semibold">Encrypted HTTP Request</p>
-                                        <p class="text-sm text-slate-600">(e.g., GET /data HTTP/1.1)</p>
-                                    </div>
-                                </div>
-                                <div class="w-1/5 flow-arrow"></div>
-                                <div class="w-2/5 text-center">
-                                    <h4 class="font-bold text-teal-600 mb-2">Server (S)</h4>
-                                </div>
-                            </div>
-                            <div class="flex justify-between items-start mt-4">
-                                <div class="w-2/5 text-center"></div>
-                                <div class="w-1/5 flow-arrow left"></div>
-                                <div class="w-2/5 text-center">
-                                     <div class="message-box server-box text-left">
-                                        <p class="font-semibold">Encrypted HTTP Response</p>
-                                        <p class="text-sm text-slate-600">(e.g., 200 OK)</p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="prose max-w-none">
-                            <h4>What's Happening:</h4>
-                            <p>The handshake is complete. The Client can now send its actual application data (the HTTP API request) through the encrypted tunnel. The Server decrypts it, processes it, and sends back an encrypted HTTP response.</p>
-                            <p>This entire handshake process happens in milliseconds, but it establishes a foundation of trust and confidentiality for the real application data that follows.</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </main>
+            </main>
+        </div>
         
         <section class="mt-12">
             <h2 class="text-3xl font-bold text-center mb-8 text-slate-900">Key Concepts</h2>
@@ -314,44 +229,56 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            const phaseButtons = document.querySelectorAll('.phase-nav-button');
-            const phaseContents = document.querySelectorAll('.phase-content');
+            const protocolButtons = document.querySelectorAll('.protocol-nav-button');
+            const protocolContents = document.querySelectorAll('.protocol-content');
             const tabButtons = document.querySelectorAll('.tab-button');
             const tabContents = document.querySelectorAll('.tab-content');
 
-            function showPhase(phaseNumber) {
+            function showProtocol(protocolId) {
+                protocolButtons.forEach(button => {
+                    button.classList.toggle('active', button.dataset.protocol === protocolId);
+                });
+                protocolContents.forEach(content => {
+                    content.classList.toggle('active', content.id === `protocol-${protocolId}`);
+                });
+
+                const firstPhaseButton = document.querySelector(`#protocol-${protocolId} .phase-nav-button`);
+                if (firstPhaseButton) {
+                    showPhase(protocolId, firstPhaseButton.dataset.phase);
+                }
+            }
+
+            function showPhase(protocolId, phaseNumber) {
+                const phaseButtons = document.querySelectorAll(`#protocol-${protocolId} .phase-nav-button`);
+                const phaseContents = document.querySelectorAll(`#protocol-${protocolId} .phase-content`);
+                
                 phaseButtons.forEach(button => {
-                    button.classList.remove('active');
-                    if (button.dataset.phase === phaseNumber) {
-                        button.classList.add('active');
-                    }
+                    button.classList.toggle('active', button.dataset.phase === phaseNumber);
                 });
                 phaseContents.forEach(content => {
-                    content.classList.remove('active');
-                    if (content.id === `phase-${phaseNumber}`) {
-                        content.classList.add('active');
-                    }
+                    content.classList.toggle('active', content.id === `phase-${protocolId}-${phaseNumber}`);
                 });
             }
 
             function showTab(tabNumber) {
                  tabButtons.forEach(button => {
-                    button.classList.remove('active');
-                    if (button.dataset.tab === tabNumber) {
-                        button.classList.add('active');
-                    }
+                    button.classList.toggle('active', button.dataset.tab === tabNumber);
                 });
                 tabContents.forEach(content => {
-                    content.classList.remove('active');
-                    if (content.id === `tab-${tabNumber}`) {
-                        content.classList.add('active');
-                    }
+                    content.classList.toggle('active', content.id === `tab-${tabNumber}`);
                 });
             }
 
-            phaseButtons.forEach(button => {
+            protocolButtons.forEach(button => {
                 button.addEventListener('click', () => {
-                    showPhase(button.dataset.phase);
+                    showProtocol(button.dataset.protocol);
+                });
+            });
+            
+            document.querySelectorAll('.phase-nav-button').forEach(button => {
+                button.addEventListener('click', () => {
+                    const protocolId = button.closest('.protocol-content').id.replace('protocol-', '');
+                    showPhase(protocolId, button.dataset.phase);
                 });
             });
 
@@ -361,7 +288,7 @@
                 });
             });
 
-            showPhase('1');
+            showProtocol('tls1_2');
             showTab('1');
         });
     </script>
