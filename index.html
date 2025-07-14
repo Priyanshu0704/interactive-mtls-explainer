@@ -68,7 +68,6 @@
                     </ul>
                 </nav>
                 <div class="border-t border-slate-200 pt-8">
-                    <!-- TLS 1.2 Phase Content Goes Here -->
                     <div id="phase-tls1_2-1" class="phase-content">
                         <div class="grid gap-8 phase-grid">
                             <div class="bg-slate-50 p-6 rounded-lg">
@@ -127,7 +126,215 @@
                             </div>
                         </div>
                     </div>
-                    <!-- Other TLS 1.2 phases will be similarly detailed -->
+                    <div id="phase-tls1_2-2" class="phase-content">
+                        <div class="grid gap-8 phase-grid">
+                            <div class="bg-slate-50 p-6 rounded-lg">
+                                <h3 class="text-2xl font-bold mb-4 text-center">Phase 2: Server Authentication</h3>
+                                <div class="flex justify-between items-start">
+                                    <div class="w-2/5 text-center"><h4 class="font-bold text-blue-600 mb-2">Client (R)</h4></div>
+                                    <div class="w-1/5 flow-arrow left"></div>
+                                    <div class="w-2/5 text-center">
+                                        <h4 class="font-bold text-teal-600 mb-2">Server (S)</h4>
+                                        <div class="message-box server-box text-left"><p class="font-semibold">Certificate</p></div>
+                                        <div class="message-box server-box text-left"><p class="font-semibold">ServerKeyExchange</p></div>
+                                        <div class="message-box server-box text-left"><p class="font-semibold">CertificateRequest</p></div>
+                                        <div class="message-box server-box text-left"><p class="font-semibold">ServerHelloDone</p></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="prose max-w-none">
+                                <h4>What's Happening:</h4>
+                                <p>The server must now prove its identity. It sends its `Certificate` chain. It then sends `ServerKeyExchange`, which contains cryptographic data the client needs to generate the session key. For mTLS, it sends a `CertificateRequest` to demand the client's identity. Finally, `ServerHelloDone` signals the end of its turn.</p>
+                            </div>
+                        </div>
+                        <div class="mt-8">
+                            <h4 class="text-xl font-semibold mb-2">Handshake Data Example</h4>
+                            <div>
+                                <p class="font-medium mb-1 text-teal-600">Messages Sent by S:</p>
+                                <pre><code>// 1. Certificate Message
+{
+  "certificate_chain": [
+    "-----BEGIN CERTIFICATE-----(Server Cert)...",
+    "-----BEGIN CERTIFICATE-----(Intermediate CA)...",
+    "-----BEGIN CERTIFICATE-----(Root CA)..."
+  ]
+}
+// 2. ServerKeyExchange Message
+{
+  "dh_parameters": { "curve": "secp256r1", "public_point": "0xSERVER_KEY_SHARE..." }
+}
+// 3. CertificateRequest Message (for mTLS)
+{
+  "acceptable_client_cert_types": ["rsa_sign", "ecdsa_sign"],
+  "acceptable_cas": [
+    "CN=My Corp Internal Client CA, O=My Corp...",
+    "..."
+  ]
+}
+// 4. ServerHelloDone (empty message)</code></pre>
+                            </div>
+                        </div>
+                        <div class="mt-8">
+                            <h4 class="text-xl font-semibold mb-2">Common Errors & Pitfalls</h4>
+                            <div class="error-box">
+                                <p class="font-semibold text-red-800">Error: `certificate_unknown`</p>
+                                <p class="text-red-700 mt-1">This error occurs on the client (R) side. It means the client has received the server's certificate but does not trust it.</p>
+                                <ul class="list-disc list-inside text-red-700 mt-2">
+                                    <li><strong>Cause:</strong> The server is using a self-signed certificate, and the client's Truststore does not contain it.</li>
+                                    <li><strong>Cause:</strong> The server's certificate was issued by a private/corporate CA, and the client's Truststore does not contain that CA's root certificate.</li>
+                                    <li><strong>Cause:</strong> The server's certificate has expired or is not yet valid.</li>
+                                </ul>
+                                <p class="font-medium mt-2 text-red-800">Example Error Log:</p>
+                                <pre class="bg-red-50 border-red-200 mt-1"><code>javax.net.ssl.SSLHandshakeException: PKIX path building failed: sun.security.provider.certpath.SunCertPathBuilderException: unable to find valid certification path to requested target</code></pre>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="phase-tls1_2-3" class="phase-content">
+                        <div class="grid gap-8 phase-grid">
+                            <div class="bg-slate-50 p-6 rounded-lg">
+                                <h3 class="text-2xl font-bold mb-4 text-center">Phase 3: Client Auth & Key Exchange</h3>
+                                <div class="flex justify-between items-start">
+                                    <div class="w-2/5 text-center">
+                                        <h4 class="font-bold text-blue-600 mb-2">Client (R)</h4>
+                                        <div class="message-box client-box text-left"><p class="font-semibold">Certificate</p></div>
+                                        <div class="message-box client-box text-left"><p class="font-semibold">ClientKeyExchange</p></div>
+                                        <div class="message-box client-box text-left"><p class="font-semibold">CertificateVerify</p></div>
+                                    </div>
+                                    <div class="w-1/5 flow-arrow"></div>
+                                    <div class="w-2/5 text-center"><h4 class="font-bold text-teal-600 mb-2">Server (S)</h4></div>
+                                </div>
+                            </div>
+                            <div class="prose max-w-none">
+                                <h4>What's Happening:</h4>
+                                <p>After validating the server, the client responds. It sends its own `Certificate` chain. It sends `ClientKeyExchange` with its part of the key generation material. Crucially, it sends `CertificateVerify`, a message containing a hash of the handshake so far, signed with its private key. This proves it owns the certificate it just sent.</p>
+                            </div>
+                        </div>
+                        <div class="mt-8">
+                            <h4 class="text-xl font-semibold mb-2">Handshake Data Example</h4>
+                            <div>
+                                <p class="font-medium mb-1 text-blue-600">Messages Sent by R:</p>
+                                <pre><code>// 1. Certificate Message
+{
+  "certificate_chain": ["-----BEGIN CERTIFICATE-----(Client Cert)..."]
+}
+// 2. ClientKeyExchange Message
+{
+  "dh_public_key": "0xCLIENT_KEY_SHARE..."
+}
+// 3. CertificateVerify Message
+{
+  "signature_algorithm": "rsa_pkcs1_sha256",
+  "signature": "0xSIGNED_HASH_OF_HANDSHAKE_MESSAGES..."
+}</code></pre>
+                            </div>
+                        </div>
+                        <div class="mt-8">
+                            <h4 class="text-xl font-semibold mb-2">Common Errors & Pitfalls</h4>
+                            <div class="error-box">
+                                <p class="font-semibold text-red-800">Error: `bad_certificate` or `access_denied`</p>
+                                <p class="text-red-700 mt-1">This error occurs on the server (S) side after it receives the client's messages. It means the server does not trust the client's certificate or the client failed to prove its identity.</p>
+                                <ul class="list-disc list-inside text-red-700 mt-2">
+                                    <li><strong>Cause:</strong> The client certificate sent by R is not in the server's Truststore.</li>
+                                    <li><strong>Cause:</strong> The client sent no certificate, but the server requires one.</li>
+                                    <li><strong>Cause:</strong> The client's signature in `CertificateVerify` is invalid, meaning it does not possess the correct private key.</li>
+                                </ul>
+                                <p class="font-medium mt-2 text-red-800">Example Error Log (on Server):</p>
+                                <pre class="bg-red-50 border-red-200 mt-1"><code>javax.net.ssl.SSLHandshakeException: Received fatal alert: bad_certificate</code></pre>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="phase-tls1_2-4" class="phase-content">
+                        <div class="grid gap-8 phase-grid">
+                            <div class="bg-slate-50 p-6 rounded-lg">
+                                <h3 class="text-2xl font-bold mb-4 text-center">Phase 4: Finalization</h3>
+                                <div class="flex justify-center items-center text-center my-4">
+                                    <p class="font-semibold text-purple-600">Both R and S independently calculate the Session Key</p>
+                                </div>
+                                <div class="flex justify-between items-start">
+                                    <div class="w-2/5 text-center"><h4 class="font-bold text-blue-600 mb-2">Client (R)</h4><div class="message-box client-box text-left"><p class="font-semibold">ChangeCipherSpec</p><p class="font-semibold mt-4">Finished</p></div></div>
+                                    <div class="w-1/5 flow-arrow"></div>
+                                    <div class="w-2/5 text-center"><h4 class="font-bold text-teal-600 mb-2">Server (S)</h4><div class="message-box server-box text-left mt-16"><p class="font-semibold">ChangeCipherSpec</p><p class="font-semibold mt-4">Finished</p></div></div>
+                                </div>
+                            </div>
+                            <div class="prose max-w-none">
+                                <h4>What's Happening:</h4>
+                                <p>Both sides now have enough information to independently calculate the shared `master_secret`, from which the symmetric session keys are derived. The client sends `ChangeCipherSpec` to signal it's switching to encryption, followed by an encrypted `Finished` message. The server does the same. When each side successfully decrypts the other's `Finished` message, the handshake is complete and confirmed to be secure.</p>
+                            </div>
+                        </div>
+                        <div class="mt-8">
+                            <h4 class="text-xl font-semibold mb-2">Handshake Data Example</h4>
+                            <div>
+                                <p class="font-medium mb-1">`Finished` Message Content:</p>
+                                <pre><code>// Both client and server send this message, encrypted with the new session key.
+{
+  "verify_data": "HASH(all_previous_handshake_messages)"
+}</code></pre>
+                            </div>
+                        </div>
+                        <div class="mt-8">
+                            <h4 class="text-xl font-semibold mb-2">Common Errors & Pitfalls</h4>
+                            <div class="error-box">
+                                <p class="font-semibold text-red-800">Error: `decrypt_error` or `bad_record_mac`</p>
+                                <p class="text-red-700 mt-1">This is a fatal error. It means one party could not decrypt or verify the `Finished` message from the other.</p>
+                                <ul class="list-disc list-inside text-red-700 mt-2">
+                                    <li><strong>Cause:</strong> The session keys were calculated differently on each side, often due to a bug in one of the TLS implementations.</li>
+                                    <li><strong>Cause:</strong> A man-in-the-middle attacker attempted to tamper with the handshake messages, causing the final verification hash to be incorrect.</li>
+                                </ul>
+                                <p class="font-medium mt-2 text-red-800">Example Error Log:</p>
+                                <pre class="bg-red-50 border-red-200 mt-1"><code>javax.net.ssl.SSLException: bad_record_mac
+// or
+javax.net.ssl.SSLHandshakeException: Decryption error</code></pre>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="phase-tls1_2-5" class="phase-content">
+                        <div class="grid gap-8 phase-grid">
+                            <div class="bg-slate-50 p-6 rounded-lg">
+                                <h3 class="text-2xl font-bold mb-4 text-center">Phase 5: Secure Data Transfer</h3>
+                                <div class="flex justify-center items-center text-center my-4">
+                                    <p class="font-bold text-xl text-green-600">--- SECURE TUNNEL IS LIVE ---</p>
+                                </div>
+                                <div class="flex justify-between items-start">
+                                    <div class="w-2/5 text-center"><h4 class="font-bold text-blue-600 mb-2">Client (R)</h4><div class="message-box client-box text-left"><p class="font-semibold">Encrypted Application Data</p></div></div>
+                                    <div class="w-1/5 flow-arrow"></div>
+                                    <div class="w-2/5 text-center"><h4 class="font-bold text-teal-600 mb-2">Server (S)</h4></div>
+                                </div>
+                                <div class="flex justify-between items-start mt-4">
+                                    <div class="w-2/5 text-center"></div>
+                                    <div class="w-1/5 flow-arrow left"></div>
+                                    <div class="w-2/5 text-center"><div class="message-box server-box text-left"><p class="font-semibold">Encrypted Application Data</p></div></div>
+                                </div>
+                            </div>
+                            <div class="prose max-w-none">
+                                <h4>What's Happening:</h4>
+                                <p>The handshake is complete. A secure, bidirectional tunnel now exists. The client can now send its actual application data (the HTTP API request) through the tunnel, encrypted with the session key. The server decrypts it, processes it, and sends back an encrypted response.</p>
+                            </div>
+                        </div>
+                        <div class="mt-8">
+                            <h4 class="text-xl font-semibold mb-2">Handshake Data Example</h4>
+                            <div>
+                                <p class="font-medium mb-1">Encrypted Application Data Record:</p>
+                                <pre><code>{
+  "type": "Application Data",
+  "version": "TLS 1.2",
+  "length": 128,
+  "encrypted_data": "0xENCRYPTED_HTTP_GET_REQUEST..."
+}</code></pre>
+                            </div>
+                        </div>
+                        <div class="mt-8">
+                            <h4 class="text-xl font-semibold mb-2">Common Errors & Pitfalls</h4>
+                            <div class="error-box">
+                                <p class="font-semibold text-red-800">Error: `Connection reset by peer`</p>
+                                <p class="text-red-700 mt-1">At this stage, errors are typically not related to the TLS handshake itself, but to the connection or application layers.</p>
+                                <ul class="list-disc list-inside text-red-700 mt-2">
+                                    <li><strong>Cause:</strong> A network firewall or load balancer terminated the connection due to an idle timeout.</li>
+                                    <li><strong>Cause:</strong> The server application crashed while processing the request.</li>
+                                    <li><strong>Cause:</strong> The client sent a malformed HTTP request that the server could not parse, causing it to close the connection.</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </main>
         </div>
@@ -144,7 +351,6 @@
                     </ul>
                 </nav>
                 <div class="border-t border-slate-200 pt-8">
-                    <!-- TLS 1.3 Phase Content Goes Here -->
                     <div id="phase-tls1_3-1" class="phase-content">
                         <div class="grid gap-8 phase-grid">
                             <div class="bg-slate-50 p-6 rounded-lg">
@@ -196,7 +402,153 @@
                             </div>
                         </div>
                     </div>
-                    <!-- Other TLS 1.3 phases will be similarly detailed -->
+                    <div id="phase-tls1_3-2" class="phase-content">
+                        <div class="grid gap-8 phase-grid">
+                            <div class="bg-slate-50 p-6 rounded-lg">
+                                <h3 class="text-2xl font-bold mb-4 text-center">Phase 2: Server Response & Key Generation</h3>
+                                <div class="flex justify-between items-start">
+                                    <div class="w-2/5 text-center"><h4 class="font-bold text-blue-600 mb-2">Client (R)</h4></div>
+                                    <div class="w-1/5 flow-arrow left"></div>
+                                    <div class="w-2/5 text-center">
+                                        <h4 class="font-bold text-teal-600 mb-2">Server (S)</h4>
+                                        <div class="message-box server-box text-left"><p class="font-semibold">ServerHello + KeyShare</p></div>
+                                        <div class="message-box server-box text-left"><p class="font-semibold">EncryptedExtensions</p></div>
+                                        <div class="message-box server-box text-left"><p class="font-semibold">CertificateRequest (for mTLS)</p></div>
+                                        <div class="message-box server-box text-left"><p class="font-semibold">Certificate</p></div>
+                                        <div class="message-box server-box text-left"><p class="font-semibold">CertificateVerify</p></div>
+                                        <div class="message-box server-box text-left"><p class="font-semibold">Finished</p></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="prose max-w-none">
+                                <h4>What's Happening:</h4>
+                                <p>The server receives the client's key share and can immediately generate the session keys. It sends back its `ServerHello` and its own `KeyShare`. From this point on, the rest of the server's messages are encrypted. It sends its `Certificate`, signs the handshake with `CertificateVerify`, and sends its `Finished` message all in one go. This single round-trip is the main performance benefit of TLS 1.3.</p>
+                            </div>
+                        </div>
+                        <div class="mt-8">
+                            <h4 class="text-xl font-semibold mb-2">Handshake Data Example</h4>
+                             <div>
+                                <p class="font-medium mb-1 text-teal-600">Messages Sent by S:</p>
+                                <pre><code>// 1. ServerHello
+{
+  "tls_version_selected": "1.3",
+  "server_random": "0xDE...A1",
+  "extensions": { "key_share": { "group": "x25519", "key_exchange": "0xSERVER_PUBLIC_KEY..." } }
+}
+// --- ENCRYPTION STARTS HERE ---
+// 2. EncryptedExtensions (confirming protocol details)
+// 3. CertificateRequest (if mTLS is required)
+// 4. Certificate (server's cert chain)
+// 5. CertificateVerify (server's signature over the handshake)
+// 6. Finished (encrypted hash of the handshake)</code></pre>
+                            </div>
+                        </div>
+                         <div class="mt-8">
+                            <h4 class="text-xl font-semibold mb-2">Common Errors & Pitfalls</h4>
+                            <div class="error-box">
+                                <p class="font-semibold text-red-800">Error: `certificate_verify_failed`</p>
+                                <p class="text-red-700 mt-1">This error occurs on the client (R) side when it tries to validate the server's `CertificateVerify` message.</p>
+                                <ul class="list-disc list-inside text-red-700 mt-2">
+                                    <li><strong>Cause:</strong> The signature sent by the server is invalid. This is extremely rare and could indicate a server misconfiguration or a potential man-in-the-middle attack.</li>
+                                    <li><strong>Cause:</strong> The client does not trust the server's certificate, so it cannot even attempt to verify the signature (this would manifest as a `certificate_unknown` error first).</li>
+                                </ul>
+                                <p class="font-medium mt-2 text-red-800">Example Error Log:</p>
+                                <pre class="bg-red-50 border-red-200 mt-1"><code>javax.net.ssl.SSLHandshakeException: Invalid signature received for CertificateVerify</code></pre>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="phase-tls1_3-3" class="phase-content">
+                        <div class="grid gap-8 phase-grid">
+                            <div class="bg-slate-50 p-6 rounded-lg">
+                                <h3 class="text-2xl font-bold mb-4 text-center">Phase 3: Client Finalization</h3>
+                                <div class="flex justify-between items-start">
+                                    <div class="w-2/5 text-center">
+                                        <h4 class="font-bold text-blue-600 mb-2">Client (R)</h4>
+                                        <div class="message-box client-box text-left"><p class="font-semibold">Certificate (for mTLS)</p></div>
+                                        <div class="message-box client-box text-left"><p class="font-semibold">CertificateVerify (for mTLS)</p></div>
+                                        <div class="message-box client-box text-left"><p class="font-semibold">Finished</p></div>
+                                    </div>
+                                    <div class="w-1/5 flow-arrow"></div>
+                                    <div class="w-2/5 text-center"><h4 class="font-bold text-teal-600 mb-2">Server (S)</h4></div>
+                                </div>
+                            </div>
+                            <div class="prose max-w-none">
+                                <h4>What's Happening:</h4>
+                                <p>The client receives the server's encrypted messages. It can now also generate the session keys. It decrypts the server's messages, validates its certificate and signature. If mTLS was requested, it sends its own `Certificate` and `CertificateVerify` messages. Finally, it sends its own encrypted `Finished` message to complete the handshake.</p>
+                            </div>
+                        </div>
+                        <div class="mt-8">
+                            <h4 class="text-xl font-semibold mb-2">Handshake Data Example</h4>
+                             <div>
+                                <p class="font-medium mb-1 text-blue-600">Messages Sent by R (all encrypted):</p>
+                                <pre><code>// 1. Certificate (only if server requested it)
+{ "certificate_chain": ["-----BEGIN CERTIFICATE-----(Client Cert)..."] }
+// 2. CertificateVerify (only if cert was sent)
+{ "signature": "0xCLIENT_SIGNATURE..." }
+// 3. Finished
+{ "verify_data": "HASH(full_handshake_context)" }</code></pre>
+                            </div>
+                        </div>
+                         <div class="mt-8">
+                            <h4 class="text-xl font-semibold mb-2">Common Errors & Pitfalls</h4>
+                            <div class="error-box">
+                                <p class="font-semibold text-red-800">Error: `bad_certificate` (on Server)</p>
+                                <p class="text-red-700 mt-1">If the server requested a client certificate, this is where it validates it. This error is identical to the one in TLS 1.2 Phase 3.</p>
+                                <ul class="list-disc list-inside text-red-700 mt-2">
+                                    <li><strong>Cause:</strong> The client certificate is not trusted by the server's Truststore.</li>
+                                    <li><strong>Cause:</strong> The client's signature in its `CertificateVerify` message is invalid.</li>
+                                </ul>
+                                <p class="font-medium mt-2 text-red-800">Example Error Log (on Server):</p>
+                                <pre class="bg-red-50 border-red-200 mt-1"><code>javax.net.ssl.SSLHandshakeException: Received fatal alert: bad_certificate</code></pre>
+                            </div>
+                        </div>
+                    </div>
+                     <div id="phase-tls1_3-4" class="phase-content">
+                        <div class="grid gap-8 phase-grid">
+                            <div class="bg-slate-50 p-6 rounded-lg">
+                                <h3 class="text-2xl font-bold mb-4 text-center">Phase 4: Secure Data Transfer</h3>
+                                <div class="flex justify-center items-center text-center my-4">
+                                    <p class="font-bold text-xl text-green-600">--- SECURE TUNNEL IS LIVE ---</p>
+                                </div>
+                                <div class="flex justify-between items-start">
+                                    <div class="w-2/5 text-center"><h4 class="font-bold text-blue-600 mb-2">Client (R)</h4><div class="message-box client-box text-left"><p class="font-semibold">Encrypted Application Data</p></div></div>
+                                    <div class="w-1/5 flow-arrow"></div>
+                                    <div class="w-2/5 text-center"><h4 class="font-bold text-teal-600 mb-2">Server (S)</h4></div>
+                                </div>
+                                <div class="flex justify-between items-start mt-4">
+                                    <div class="w-2/5 text-center"></div>
+                                    <div class="w-1/5 flow-arrow left"></div>
+                                    <div class="w-2/5 text-center"><div class="message-box server-box text-left"><p class="font-semibold">Encrypted Application Data</p></div></div>
+                                </div>
+                            </div>
+                            <div class="prose max-w-none">
+                                <h4>What's Happening:</h4>
+                                <p>The handshake is complete. The client can now immediately begin sending encrypted application data. In TLS 1.3, this can sometimes happen even before the server's final `Finished` message is received, a feature called "0-RTT" (Zero Round Trip Time), further speeding up connections.</p>
+                            </div>
+                        </div>
+                        <div class="mt-8">
+                            <h4 class="text-xl font-semibold mb-2">Handshake Data Example</h4>
+                            <div>
+                                <p class="font-medium mb-1">Encrypted Application Data Record:</p>
+                                <pre><code>{
+  "type": "Application Data",
+  "version": "TLS 1.3",
+  "length": 150,
+  "encrypted_data": "0xENCRYPTED_HTTP_POST_REQUEST..."
+}</code></pre>
+                            </div>
+                        </div>
+                        <div class="mt-8">
+                            <h4 class="text-xl font-semibold mb-2">Common Errors & Pitfalls</h4>
+                            <div class="error-box">
+                                <p class="font-semibold text-red-800">Error: `Connection reset` or Application-level errors</p>
+                                <p class="text-red-700 mt-1">As with TLS 1.2, once the handshake is complete, errors are typically no longer at the TLS protocol level.</p>
+                                <ul class="list-disc list-inside text-red-700 mt-2">
+                                    <li><strong>Cause:</strong> Network timeouts, application crashes, or malformed HTTP requests sent over the secure channel.</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </main>
         </div>
